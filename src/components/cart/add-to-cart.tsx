@@ -2,7 +2,7 @@
 
 import { useCart } from "./cart-provider";
 
-/** Add button that becomes a −/qty/＋ stepper once the item is in the cart. */
+/** Circular add button that becomes a compact −/qty/＋ stepper once in the cart. */
 export function AddToCart({
   id,
   name,
@@ -19,7 +19,7 @@ export function AddToCart({
 
   if (!available) {
     return (
-      <span className="text-xs font-semibold uppercase tracking-wide text-danger">
+      <span className="inline-block whitespace-nowrap text-xs font-medium text-danger">
         Sold out
       </span>
     );
@@ -30,35 +30,33 @@ export function AddToCart({
       <button
         type="button"
         onClick={() => add({ id, name, price_paise: pricePaise })}
-        className="h-9 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+        aria-label={`Add ${name}`}
+        className="grid size-9 place-items-center rounded-full bg-accent text-on-accent shadow-sm transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
-        Add
+        <PlusIcon />
       </button>
     );
   }
 
   return (
-    <div className="flex items-center gap-1 rounded-lg bg-accent/12 p-0.5">
-      <StepperButton label={`Remove one ${name}`} onClick={() => setQty(id, qty - 1)}>
+    <div className="flex items-center gap-0.5 rounded-full bg-accent/12 p-0.5">
+      <StepBtn label={`Remove one ${name}`} onClick={() => setQty(id, qty - 1)}>
         <MinusIcon />
-      </StepperButton>
-      <span
-        aria-live="polite"
-        className="min-w-6 text-center text-sm font-semibold tabular-nums text-on-accent"
-      >
+      </StepBtn>
+      <span className="min-w-6 text-center text-sm font-semibold tabular-nums text-on-accent">
         {qty}
       </span>
-      <StepperButton
+      <StepBtn
         label={`Add another ${name}`}
         onClick={() => add({ id, name, price_paise: pricePaise })}
       >
         <PlusIcon />
-      </StepperButton>
+      </StepBtn>
     </div>
   );
 }
 
-function StepperButton({
+function StepBtn({
   label,
   onClick,
   children,
@@ -72,7 +70,7 @@ function StepperButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="grid size-8 place-items-center rounded-md text-on-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+      className="grid size-7 place-items-center rounded-full text-on-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
     >
       {children}
     </button>
