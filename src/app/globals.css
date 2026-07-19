@@ -1,38 +1,94 @@
 @import "tailwindcss";
 
 /*
- * Night Canteen design tokens (M0 scaffold).
- * Minimal, warm, light theme with a single appetizing accent.
- * Detailed screen design lands in M1/M2; this establishes the palette.
+ * Night Canteen design tokens — see DESIGN.md for rationale.
+ * Mood: midnight food-truck window; light legible surface, night+amber carried
+ * by brand color, wordmark, and drenched header moments. All colors OKLCH.
+ * Contrast verified to WCAG AA.
  */
 :root {
-  --background: #faf9f7; /* warm off-white */
-  --foreground: #1c1917; /* near-black (stone-900) */
-  --card: #ffffff;
-  --muted: #78716c; /* stone-500 */
-  --border: #e7e5e4; /* stone-200 */
-  --accent: #ea580c; /* orange-600 — warm, food-forward */
-  --accent-foreground: #ffffff;
-  --success: #16a34a; /* green-600 */
-  --danger: #dc2626; /* red-600 */
+  /* neutrals — a whisper of cool "night air" */
+  --background: oklch(0.985 0.006 250);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.965 0.008 250);
+  --foreground: oklch(0.24 0.03 258);
+  --muted: oklch(0.48 0.025 258);
+  --border: oklch(0.912 0.008 255);
+  --border-strong: oklch(0.85 0.012 255);
+
+  /* brand — midnight indigo */
+  --primary: oklch(0.42 0.105 250);
+  --primary-hover: oklch(0.36 0.1 250);
+  --primary-deep: oklch(0.26 0.07 256);
+  --on-primary: oklch(0.99 0.01 250);
+
+  /* accent — warm amber "lamp glow" (light → always dark text on it) */
+  --accent: oklch(0.8 0.14 74);
+  --accent-hover: oklch(0.75 0.145 68);
+  --on-accent: oklch(0.26 0.05 60);
+
+  /* semantic */
+  --success: oklch(0.5 0.13 152);
+  --success-bg: oklch(0.95 0.03 150);
+  --danger: oklch(0.5 0.21 25);
+  --danger-bg: oklch(0.96 0.03 25);
+
+  /* soft, ink-tinted elevation */
+  --shadow-card: 0 1px 2px oklch(0.24 0.03 258 / 0.04),
+    0 4px 12px oklch(0.24 0.03 258 / 0.05);
+  --shadow-float: 0 4px 12px oklch(0.24 0.03 258 / 0.08),
+    0 12px 32px oklch(0.24 0.03 258 / 0.12);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-foreground: var(--foreground);
-  --color-card: var(--card);
   --color-muted: var(--muted);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-deep: var(--primary-deep);
+  --color-on-primary: var(--on-primary);
   --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
   --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
   --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+
+  --font-display: var(--font-fraunces);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+/* tinted soft shadows as utilities */
+@utility shadow-card {
+  box-shadow: var(--shadow-card);
+}
+@utility shadow-float {
+  box-shadow: var(--shadow-float);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Motion is opt-in to state changes; respect reduced motion everywhere. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

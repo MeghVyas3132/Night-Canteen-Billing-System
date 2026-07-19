@@ -1,76 +1,91 @@
-import { getSystemStatus } from "@/lib/health";
+import { getMenu, type MenuItem } from "@/lib/menu";
+import { CustomerHero } from "@/components/customer-hero";
+import { Badge } from "@/components/ui/badge";
+import { formatPaise } from "@/lib/format";
+import { cn } from "@/lib/cn";
 
-// Reads live DB state on every request; never prerender at build time.
+// Reads live menu on every request.
 export const dynamic = "force-dynamic";
 
-/**
- * M0 landing / system-status page.
- * Proves the app is running and can reach Supabase end-to-end. This placeholder
- * is replaced by the customer welcome + menu in M1/M2.
- */
 export default async function Home() {
-  const status = await getSystemStatus();
-
-  const checks = [
-    { label: "App running", ok: true, detail: "Next.js 16 on Vercel-ready setup" },
-    {
-      label: "Supabase configured",
-      ok: status.supabaseConfigured,
-      detail: status.supabaseConfigured
-        ? "Environment keys detected"
-        : "Add keys to .env.local — see SETUP.md",
-    },
-    {
-      label: "Database reachable",
-      ok: status.dbReachable,
-      detail: status.dbReachable
-        ? `${status.itemCount} menu item${status.itemCount === 1 ? "" : "s"} found`
-        : status.error
-          ? status.error
-          : "Run the migration + seed — see SETUP.md",
-    },
-  ];
+  const menu = await getMenu();
+  const hasMenu = menu.categories.length > 0;
 
   return (
-    <main className="flex flex-1 items-center justify-center px-6 py-16">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-2xl text-accent-foreground shadow-sm">
-            🌙
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Night Canteen</h1>
-          <p className="mt-1 text-sm text-muted">QR ordering system — foundations (M0)</p>
-        </div>
+    <div className="flex min-h-full flex-col">
+      <CustomerHero />
 
-        <div className="rounded-2xl border border-border bg-card p-2 shadow-sm">
-          <ul className="divide-y divide-border">
-            {checks.map((check) => (
-              <li key={check.label} className="flex items-start gap-3 px-4 py-3.5">
-                <span
-                  aria-hidden
-                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                    check.ok
-                      ? "bg-success/10 text-success"
-                      : "bg-danger/10 text-danger"
-                  }`}
-                >
-                  {check.ok ? "✓" : "!"}
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium">{check.label}</span>
-                  <span className="block truncate text-xs text-muted">
-                    {check.detail}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
+      <main className="relative z-10 -mt-5 flex-1 rounded-t-[1.75rem] bg-background px-5 pb-16 pt-7">
+        <div className="mx-auto max-w-lg">
+          {hasMenu ? (
+            <div className="space-y-8">
+              {menu.categories.map((category) => (
+                <section key={category.id}>
+                  <h2 className="mb-2.5 px-1 text-base font-semibold text-foreground">
+                    {category.name}
+                  </h2>
+                  <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
+                    {category.items.map((item, i) => (
+                      <MenuItemRow key={item.id} item={item} first={i === 0} />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <MenuEmptyState configured={menu.configured} />
+          )}
 
-        <p className="mt-6 text-center text-xs text-muted">
-          Milestone M0 · next up: menu &amp; admin management (M1)
-        </p>
+          <p className="mt-10 text-center text-xs text-muted">
+            Pay at checkout · order called by number when it&rsquo;s ready
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function MenuItemRow({ item, first }: { item: MenuItem; first: boolean }) {
+  const soldOut = !item.is_available;
+  return (
+    <div
+      className={cn(
+        "flex items-start justify-between gap-4 px-4 py-3.5",
+        !first && "border-t border-border",
+        soldOut && "opacity-60",
+      )}
+    >
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h3 className="text-[15px] font-medium text-foreground">
+            {item.name}
+          </h3>
+          {soldOut && <Badge tone="danger">Sold out</Badge>}
+        </div>
+        {item.description && (
+          <p className="mt-0.5 line-clamp-2 text-sm text-muted">
+            {item.description}
+          </p>
+        )}
       </div>
-    </main>
+      <div className="shrink-0 pt-0.5 text-[15px] font-medium tabular-nums text-foreground">
+        {formatPaise(item.price_paise)}
+      </div>
+    </div>
+  );
+}
+
+function MenuEmptyState({ configured }: { configured: boolean }) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border-strong bg-surface px-6 py-12 text-center">
+      <p className="text-base font-medium text-foreground">
+        The menu is being set up
+      </p>
+      <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted">
+        {configured
+          ? "No items are on the menu yet. Check back in a bit."
+          : "Almost there — finish the Supabase setup in SETUP.md to load the menu."}
+      </p>
+    </div>
   );
 }
