@@ -26,9 +26,12 @@ export async function getSystemStatus(): Promise<SystemStatus> {
 
   try {
     const supabase = await createClient();
+    // Non-HEAD query so a missing table surfaces as an error (a HEAD count
+    // request swallows the 404 and falsely looks reachable).
     const { count, error } = await supabase
       .from("menu_items")
-      .select("*", { count: "exact", head: true });
+      .select("id", { count: "exact" })
+      .limit(1);
 
     if (error) {
       return {
