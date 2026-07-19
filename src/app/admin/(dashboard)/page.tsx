@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// Admin home → menu management (the live order board arrives in M4).
+// Admin home → the live order board.
 export default function AdminIndex() {
-  redirect("/admin/menu");
+  redirect("/admin/orders");
 }

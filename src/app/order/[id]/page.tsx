@@ -5,29 +5,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { formatPaise } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
+import { AutoRefresh } from "@/components/auto-refresh";
+import {
+  STATUS_META,
+  CUSTOMER_STEPS,
+  type OrderStatus,
+} from "@/lib/order-status";
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
-
-type OrderStatus =
-  | "pending_payment"
-  | "new"
-  | "preparing"
-  | "ready"
-  | "completed"
-  | "cancelled";
-
-const STATUS: Record<
-  OrderStatus,
-  { label: string; tone: "neutral" | "success" | "danger" | "accent" | "primary" }
-> = {
-  pending_payment: { label: "Awaiting payment", tone: "accent" },
-  new: { label: "Order received", tone: "primary" },
-  preparing: { label: "Preparing", tone: "primary" },
-  ready: { label: "Ready for pickup", tone: "success" },
-  completed: { label: "Completed", tone: "neutral" },
-  cancelled: { label: "Cancelled", tone: "danger" },
-};
 
 export default async function OrderPage({
   params,
@@ -48,7 +34,6 @@ export default async function OrderPage({
     .eq("id", id)
     .maybeSingle();
 
-  // Only the session that placed the order can view it.
   if (!order || order.session_id !== session.id) notFound();
 
   const { data: items } = await supabase
@@ -58,11 +43,17 @@ export default async function OrderPage({
     .order("name_snapshot");
 
   const status = (order.status as OrderStatus) ?? "pending_payment";
-  const meta = STATUS[status];
+  const meta = STATUS_META[status];
   const pending = status === "pending_payment";
+  const done = status === "completed" || status === "cancelled";
+  const activeStep = CUSTOMER_STEPS.findIndex((s) => s.status === status);
+  const showSteps = ["new", "preparing", "ready"].includes(status);
 
   return (
     <div className="flex min-h-full flex-col">
+      {/* Poll for status changes until the order is finished. */}
+      <AutoRefresh stop={done || pending} />
+
       <header className="bg-primary-deep text-on-primary">
         <div className="mx-auto flex max-w-lg items-center gap-2.5 px-5 py-4">
           <svg viewBox="0 0 24 24" className="size-5 text-accent" fill="currentColor" aria-hidden>
@@ -84,7 +75,9 @@ export default async function OrderPage({
                   : "Order placed"}
               </p>
               <h1 className="mt-0.5 text-xl font-semibold text-foreground">
-                Thanks, {order.customer_name}
+                {status === "ready"
+                  ? "Ready for pickup! 🎉"
+                  : `Thanks, ${order.customer_name}`}
               </h1>
             </div>
             <Badge tone={meta.tone} dot>
@@ -95,11 +88,59 @@ export default async function OrderPage({
           {pending && (
             <div className="mt-4 rounded-xl bg-accent/12 px-4 py-3 text-sm text-on-accent">
               Waiting to confirm your payment. If you&rsquo;ve just paid, this
-              will update in a moment — pull to refresh.
+              will update in a moment.
             </div>
           )}
 
-          <div className="mt-5 space-y-2.5">
+          {status === "cancelled" && (
+            <div className="mt-4 rounded-xl bg-danger-bg px-4 py-3 text-sm text-danger">
+              This order was cancelled. If you were charged, it will be refunded.
+            </div>
+          )}
+
+          {showSteps && (
+            <ol className="mt-5 flex items-center">
+              {CUSTOMER_STEPS.map((step, i) => {
+                const reached = i <= activeStep;
+                const current = i === activeStep;
+                return (
+                  <li key={step.status} className="flex flex-1 items-center last:flex-none">
+                    <div className="flex flex-col items-center">
+                      <span
+                        className={cn(
+                          "grid size-8 place-items-center rounded-full text-sm font-semibold transition-colors",
+                          reached
+                            ? "bg-primary text-on-primary"
+                            : "bg-surface-2 text-muted",
+                          current && step.status === "ready" && "bg-success",
+                        )}
+                      >
+                        {reached ? "✓" : i + 1}
+                      </span>
+                      <span
+                        className={cn(
+                          "mt-1.5 text-xs",
+                          reached ? "font-medium text-foreground" : "text-muted",
+                        )}
+                      >
+                        {step.label}
+                      </span>
+                    </div>
+                    {i < CUSTOMER_STEPS.length - 1 && (
+                      <span
+                        className={cn(
+                          "mx-1 mb-5 h-0.5 flex-1 rounded",
+                          i < activeStep ? "bg-primary" : "bg-border",
+                        )}
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+
+          <div className="mt-6 space-y-2.5">
             {(items ?? []).map((it, i) => (
               <div key={i} className="flex items-baseline justify-between gap-3 text-sm">
                 <span className="text-foreground">

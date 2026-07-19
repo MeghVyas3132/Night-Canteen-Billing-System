@@ -1,6 +1,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { signOut } from "@/lib/actions/auth";
+import { AdminNav } from "@/components/admin/admin-nav";
 import type { AdminProfile } from "@/lib/admin";
 
 /** Admin app shell: midnight top bar + centered content column. */
@@ -14,8 +15,8 @@ export function AdminShell({
   return (
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-primary-deep text-on-primary">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
-          <Link href="/admin/menu" className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 pt-3">
+          <Link href="/admin/orders" className="flex items-center gap-2">
             <svg
               viewBox="0 0 24 24"
               className="size-5 text-accent"
@@ -41,6 +42,9 @@ export function AdminShell({
               </button>
             </form>
           </div>
+        </div>
+        <div className="mx-auto max-w-3xl px-3 pb-2 pt-1.5">
+          <AdminNav />
         </div>
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">{children}</main>

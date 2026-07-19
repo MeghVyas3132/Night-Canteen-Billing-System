@@ -287,17 +287,34 @@ test thoroughly with Razorpay test cards.
 **Done when:** a test-mode payment moves an order onto the live queue; a failed payment does not.
 
 ### M4 — Live admin board + status flow
-Realtime order board (Supabase Realtime + polling fallback). Status transitions New →
-Preparing → Ready → Completed (+ Cancel). Customer sees their own status update live.
+Staff order board (paid orders, newest-first) with status transitions New → Preparing →
+Ready → Completed (+ Cancel). Board and customer status page both **poll (~4s)** — chosen
+over Realtime for reliability/simplicity; upgradable later. Customer sees their own status live.
 **Why fifth:** ties the operational loop together once there are real paid orders to move.
-**Done when:** staff run a full shift loop and the customer's screen reflects status changes live.
+**Done when:** staff run a full shift loop and the customer's screen reflects status changes.
 
-### M5 — Hardening, security & polish
-Rate limiting, session expiry, audit log, failed-login lockout, full input-validation /
-XSS / CSRF / injection pass, empty/error/loading states, real-phone QA, and the live-keys
-swap checklist.
-**Why last:** with the flows proven, this is where reliability — the thing that protects your
-reputation — gets locked in before launch.
+### M5 — Admin login hardening
+Login **rate-limit + lockout** (DB-based), **Cloudflare Turnstile CAPTCHA**, **TOTP 2FA**
+(enroll + challenge via Supabase MFA), and failed-login logging with a recent-security-events
+view. Email alerts deferred to M8.
+**Why here:** the admin surface holds money + menu control; harden it before wider exposure.
+**Done when:** login resists brute-force/stuffing and requires a second factor for staff.
+
+### M6 — Analytics dashboard
+Admin `/analytics`: total sales, order count, avg order value, sales-over-time, best-sellers,
+sales-by-hour, category split — with charts; Today / 7-day / All-time filters. Computed
+on-demand with SQL aggregates over **paid** orders (no rollup infra).
+**Done when:** staff can see sales + best-sellers for a chosen window.
+
+### M7 — Menu enhancements
+Item/category **reordering** (up/down), category **rename/delete** (safeguarded), and optional
+**item photos** (Supabase Storage; text-only items still look clean).
+**Done when:** staff fully control menu structure + imagery from their phone.
+
+### M8 — Launch hardening
+Session expiry, XSS/CSRF/injection pass, empty/error/loading states, real-phone QA, email
+alerts for failed logins, CSP, and the **live Razorpay keys + webhook** swap.
+**Why last:** with all flows proven, lock in reliability before launch.
 **Done when:** v1 is launch-ready and passes a security + mobile QA checklist.
 
 ---
