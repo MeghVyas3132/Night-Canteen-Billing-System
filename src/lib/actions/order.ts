@@ -1,8 +1,10 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureSession } from "@/lib/session";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isSupabaseConfigured, isRazorpayConfigured } from "@/lib/env";
+import { createRazorpayOrder, razorpayKeyId } from "@/lib/razorpay";
 
 export type CreateOrderInput = {
   items: { id: string; qty: number }[];
@@ -11,20 +13,33 @@ export type CreateOrderInput = {
   idempotencyKey: string;
 };
 
-export type CreateOrderResult = { orderId?: string; error?: string };
+export type CreateOrderResult =
+  | { error: string }
+  | { alreadyPaid: true; orderId: string }
+  | {
+      orderId: string;
+      razorpayOrderId: string;
+      amountPaise: number;
+      keyId: string;
+      customerName: string;
+      phone: string | null;
+    };
 
 const MAX_QTY_PER_ITEM = 50;
 
 /**
- * Creates a pending-payment order. ALL pricing is recomputed server-side from
- * the DB — the client only sends item ids + quantities. Payment (M3) then moves
- * the order into the kitchen queue.
+ * Creates (or re-uses, for retries) a pending order + its Razorpay order.
+ * ALL pricing is recomputed server-side; the client only sends ids + quantities.
+ * Idempotent on `idempotencyKey`, so a retry re-opens payment for the same order.
  */
 export async function createOrder(
   input: CreateOrderInput,
 ): Promise<CreateOrderResult> {
   if (!isSupabaseConfigured()) {
     return { error: "Ordering isn't available yet. Please try again later." };
+  }
+  if (!isRazorpayConfigured()) {
+    return { error: "Payments aren't set up yet. Please try again soon." };
   }
 
   const name = (input.name ?? "").trim();
@@ -36,7 +51,35 @@ export async function createOrder(
     return { error: "Enter a valid phone number, or leave it blank." };
   }
 
-  // Collapse + sanitize requested quantities.
+  const supabase = createAdminClient();
+
+  // Retry path: same idempotency key → same order (re-open its payment).
+  if (input.idempotencyKey) {
+    const { data: existing } = await supabase
+      .from("orders")
+      .select(
+        "id,total_paise,payment_status,razorpay_order_id,customer_name,customer_phone",
+      )
+      .eq("idempotency_key", input.idempotencyKey)
+      .maybeSingle();
+    if (existing) {
+      if (existing.payment_status === "paid") {
+        return { alreadyPaid: true, orderId: existing.id };
+      }
+      const rzpId = await ensureRazorpayOrder(supabase, existing.id, existing.razorpay_order_id, existing.total_paise);
+      if (!rzpId) return { error: "Couldn't start the payment. Please try again." };
+      return {
+        orderId: existing.id,
+        razorpayOrderId: rzpId,
+        amountPaise: existing.total_paise,
+        keyId: razorpayKeyId(),
+        customerName: existing.customer_name,
+        phone: existing.customer_phone,
+      };
+    }
+  }
+
+  // New order: sanitize quantities.
   const wanted = new Map<string, number>();
   for (const it of Array.isArray(input.items) ? input.items : []) {
     if (typeof it?.id !== "string") continue;
@@ -49,19 +92,7 @@ export async function createOrder(
   }
   if (wanted.size === 0) return { error: "Your cart is empty." };
 
-  const supabase = createAdminClient();
-
-  // Idempotency: a repeated submit with the same key returns the same order.
-  if (input.idempotencyKey) {
-    const { data: existing } = await supabase
-      .from("orders")
-      .select("id")
-      .eq("idempotency_key", input.idempotencyKey)
-      .maybeSingle();
-    if (existing) return { orderId: existing.id };
-  }
-
-  // Authoritative item data straight from the DB.
+  // Authoritative item data from the DB.
   const ids = [...wanted.keys()];
   const { data: dbItems, error: itemsErr } = await supabase
     .from("menu_items")
@@ -81,7 +112,6 @@ export async function createOrder(
     };
   }
 
-  // Compute totals server-side (integer paise).
   let subtotal = 0;
   const orderItems = ids.map((id) => {
     const item = byId.get(id)!;
@@ -122,14 +152,13 @@ export async function createOrder(
     .single();
 
   if (orderErr || !order) {
-    // Likely a race on the idempotency key — return the winning order.
     if (input.idempotencyKey) {
       const { data: existing } = await supabase
         .from("orders")
         .select("id")
         .eq("idempotency_key", input.idempotencyKey)
         .maybeSingle();
-      if (existing) return { orderId: existing.id };
+      if (existing) return createOrder(input); // rare race — restart on the retry path
     }
     return { error: "Couldn't place your order. Please try again." };
   }
@@ -137,11 +166,40 @@ export async function createOrder(
   const { error: itemsInsertErr } = await supabase
     .from("order_items")
     .insert(orderItems.map((oi) => ({ ...oi, order_id: order.id })));
-
   if (itemsInsertErr) {
-    await supabase.from("orders").delete().eq("id", order.id); // best-effort cleanup
+    await supabase.from("orders").delete().eq("id", order.id);
     return { error: "Couldn't place your order. Please try again." };
   }
 
-  return { orderId: order.id };
+  const rzpId = await ensureRazorpayOrder(supabase, order.id, null, total);
+  if (!rzpId) {
+    // Order persists as pending; a retry (same key) will re-attempt payment.
+    return { error: "Couldn't start the payment. Please try again." };
+  }
+
+  return {
+    orderId: order.id,
+    razorpayOrderId: rzpId,
+    amountPaise: total,
+    keyId: razorpayKeyId(),
+    customerName: name,
+    phone,
+  };
+}
+
+/** Returns the order's Razorpay order id, creating + storing it if needed. */
+async function ensureRazorpayOrder(
+  supabase: SupabaseClient,
+  orderId: string,
+  existingRazorpayOrderId: string | null,
+  amountPaise: number,
+): Promise<string | null> {
+  if (existingRazorpayOrderId) return existingRazorpayOrderId;
+  const rzp = await createRazorpayOrder(amountPaise, orderId);
+  if (!rzp) return null;
+  await supabase
+    .from("orders")
+    .update({ razorpay_order_id: rzp.id })
+    .eq("id", orderId);
+  return rzp.id;
 }

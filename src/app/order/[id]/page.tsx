@@ -94,8 +94,8 @@ export default async function OrderPage({
 
           {pending && (
             <div className="mt-4 rounded-xl bg-accent/12 px-4 py-3 text-sm text-on-accent">
-              Online payment is coming soon. Once you pay, your order goes
-              straight to the kitchen.
+              Waiting to confirm your payment. If you&rsquo;ve just paid, this
+              will update in a moment — pull to refresh.
             </div>
           )}
 

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/components/cart/cart-provider";
 import { createOrder } from "@/lib/actions/order";
+import { verifyPayment } from "@/lib/actions/payment";
+import { loadRazorpay, UPI_ONLY_CONFIG } from "@/components/cart/razorpay-checkout";
 import { formatPaise } from "@/lib/format";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Input, Field } from "@/components/ui/input";
@@ -15,7 +17,7 @@ export function CheckoutForm() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   // Stable idempotency key for this checkout attempt (once per mount).
@@ -38,29 +40,75 @@ export function CheckoutForm() {
     );
   }
 
-  function placeOrder() {
+  async function payNow() {
     setError(null);
     if (!name.trim()) {
       setError("Please enter your name so we can call your order.");
       return;
     }
-    const items = lines.map((l) => ({ id: l.id, qty: l.qty }));
-    start(async () => {
-      const res = await createOrder({
-        items,
-        name: name.trim(),
-        phone: phone.trim() || undefined,
-        idempotencyKey,
-      });
-      if (res.error) {
-        setError(res.error);
-        return;
-      }
-      if (res.orderId) {
-        clear();
-        router.push(`/order/${res.orderId}`);
-      }
+    setBusy(true);
+
+    const res = await createOrder({
+      items: lines.map((l) => ({ id: l.id, qty: l.qty })),
+      name: name.trim(),
+      phone: phone.trim() || undefined,
+      idempotencyKey,
     });
+
+    if ("error" in res) {
+      setError(res.error);
+      setBusy(false);
+      return;
+    }
+    if ("alreadyPaid" in res) {
+      clear();
+      router.push(`/order/${res.orderId}`);
+      return;
+    }
+
+    const Razorpay = await loadRazorpay();
+    if (!Razorpay) {
+      setError("Couldn't open the payment window. Check your connection and try again.");
+      setBusy(false);
+      return;
+    }
+
+    const rzp = new Razorpay({
+      key: res.keyId,
+      order_id: res.razorpayOrderId,
+      amount: res.amountPaise,
+      currency: "INR",
+      name: "Night Canteen",
+      description: "Food order",
+      prefill: { name: res.customerName, contact: res.phone ?? undefined },
+      theme: { color: "#2b2a5c" },
+      config: UPI_ONLY_CONFIG,
+      handler: async (response) => {
+        const v = await verifyPayment({
+          orderId: res.orderId,
+          razorpayOrderId: response.razorpay_order_id,
+          razorpayPaymentId: response.razorpay_payment_id,
+          razorpaySignature: response.razorpay_signature,
+        });
+        if (v.ok) {
+          clear();
+          router.push(`/order/${res.orderId}`);
+        } else {
+          setError(
+            v.error ??
+              "We couldn't verify your payment. If money was deducted, it will be refunded.",
+          );
+          setBusy(false);
+        }
+      },
+      modal: {
+        ondismiss: () => {
+          setBusy(false);
+          setError("Payment cancelled — your cart is saved. Tap to pay again.");
+        },
+      },
+    });
+    rzp.open();
   }
 
   return (
@@ -138,11 +186,14 @@ export function CheckoutForm() {
         </p>
       )}
 
-      <Button onClick={placeOrder} loading={pending} size="lg" className="w-full">
-        {pending ? "Placing order…" : `Place order · ${formatPaise(subtotalPaise)}`}
+      <Button onClick={payNow} loading={busy} size="lg" className="w-full">
+        {busy ? "Processing…" : `Pay ${formatPaise(subtotalPaise)} with UPI`}
       </Button>
-      <p className="text-center text-xs text-muted">
-        Online payment arrives next — for now this places a pending order.
+      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted">
+        <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+        Secure UPI payment via Razorpay
       </p>
     </div>
   );
