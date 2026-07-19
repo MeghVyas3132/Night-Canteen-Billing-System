@@ -81,6 +81,17 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+@keyframes nc-slide-up {
+  from {
+    transform: translateY(120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 /* Motion is opt-in to state changes; respect reduced motion everywhere. */
 @media (prefers-reduced-motion: reduce) {
   *,
