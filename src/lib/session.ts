@@ -63,7 +63,10 @@ export async function ensureSession(
     .insert({ token, name, phone })
     .select("id")
     .single();
-  if (error || !data) throw new Error("Could not create session");
+  if (error || !data) {
+    console.error("customer_sessions insert failed:", error?.message ?? "no data");
+    throw new Error("Could not create session");
+  }
 
   jar.set(COOKIE, token, {
     httpOnly: true,

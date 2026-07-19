@@ -98,7 +98,13 @@ export async function createOrder(
   });
   const total = subtotal; // no taxes/fees in v1
 
-  const session = await ensureSession(name, phone);
+  let session: Awaited<ReturnType<typeof ensureSession>>;
+  try {
+    session = await ensureSession(name, phone);
+  } catch (e) {
+    console.error("createOrder: could not create session:", e);
+    return { error: "Couldn't place your order. Please try again." };
+  }
 
   const { data: order, error: orderErr } = await supabase
     .from("orders")
