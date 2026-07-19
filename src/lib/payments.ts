@@ -9,7 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
  */
 export async function markOrderPaid(
   orderId: string,
-  paymentId: string,
+  paymentId: string | null,
 ): Promise<void> {
   const supabase = createAdminClient();
 

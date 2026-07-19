@@ -12,10 +12,13 @@ import { Button, buttonClasses } from "@/components/ui/button";
 import { Input, Field } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 
+type Method = "upi" | "cash";
+
 export function CheckoutForm() {
   const { lines, subtotalPaise, count, setQty, clear, hydrated } = useCart();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [method, setMethod] = useState<Method>("upi");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -40,10 +43,14 @@ export function CheckoutForm() {
     );
   }
 
-  async function payNow() {
+  async function placeOrder() {
     setError(null);
     if (!name.trim()) {
       setError("Please enter your name so we can call your order.");
+      return;
+    }
+    if (!phone.trim()) {
+      setError("Please enter your phone number.");
       return;
     }
     setBusy(true);
@@ -51,7 +58,8 @@ export function CheckoutForm() {
     const res = await createOrder({
       items: lines.map((l) => ({ id: l.id, qty: l.qty })),
       name: name.trim(),
-      phone: phone.trim() || undefined,
+      phone: phone.trim(),
+      paymentMethod: method,
       idempotencyKey,
     });
 
@@ -60,7 +68,8 @@ export function CheckoutForm() {
       setBusy(false);
       return;
     }
-    if ("alreadyPaid" in res) {
+    // Cash order (or already paid) → straight to the status page.
+    if ("cash" in res || "alreadyPaid" in res) {
       clear();
       router.push(`/order/${res.orderId}`);
       return;
@@ -162,22 +171,41 @@ export function CheckoutForm() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={60}
-            placeholder="e.g. Aryan"
+            placeholder="e.g. Megh Vyas"
             autoComplete="name"
             required
           />
         </Field>
-        <Field label="Phone (optional)" htmlFor="phone">
+        <Field label="Phone" htmlFor="phone" hint="So we can reach you about your order.">
           <Input
             id="phone"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             inputMode="tel"
             maxLength={15}
-            placeholder="For updates"
+            placeholder="10-digit number"
             autoComplete="tel"
+            required
           />
         </Field>
+      </section>
+
+      <section className="rounded-2xl border border-border bg-surface p-5 shadow-card">
+        <p className="mb-3 text-sm font-medium text-foreground">Payment</p>
+        <div className="grid grid-cols-2 gap-2">
+          <MethodOption
+            active={method === "upi"}
+            onClick={() => setMethod("upi")}
+            title="UPI"
+            subtitle="Pay now, instantly"
+          />
+          <MethodOption
+            active={method === "cash"}
+            onClick={() => setMethod("cash")}
+            title="Cash"
+            subtitle="Pay at the counter"
+          />
+        </div>
       </section>
 
       {error && (
@@ -186,16 +214,57 @@ export function CheckoutForm() {
         </p>
       )}
 
-      <Button onClick={payNow} loading={busy} size="lg" className="w-full">
-        {busy ? "Processing…" : `Pay ${formatPaise(subtotalPaise)} with UPI`}
+      <Button onClick={placeOrder} loading={busy} size="lg" className="w-full">
+        {busy
+          ? "Processing…"
+          : method === "upi"
+            ? `Pay ${formatPaise(subtotalPaise)} with UPI`
+            : `Place order · ${formatPaise(subtotalPaise)} cash`}
       </Button>
-      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted">
-        <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        </svg>
-        Secure UPI payment via Razorpay
-      </p>
+      {method === "upi" ? (
+        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted">
+          <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          Secure UPI payment via Razorpay
+        </p>
+      ) : (
+        <p className="text-center text-xs text-muted">
+          Pay in cash at the counter — we&rsquo;ll start your order once it&rsquo;s received.
+        </p>
+      )}
     </div>
+  );
+}
+
+function MethodOption({
+  active,
+  onClick,
+  title,
+  subtitle,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "rounded-xl border px-4 py-3 text-left transition-colors",
+        active
+          ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+          : "border-border-strong hover:bg-surface-2",
+      )}
+    >
+      <span className="block text-[15px] font-semibold text-foreground">
+        {title}
+      </span>
+      <span className="block text-xs text-muted">{subtitle}</span>
+    </button>
   );
 }
 

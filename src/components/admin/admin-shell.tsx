@@ -2,14 +2,17 @@ import * as React from "react";
 import Link from "next/link";
 import { signOut } from "@/lib/actions/auth";
 import { AdminNav } from "@/components/admin/admin-nav";
+import { StoreToggle } from "@/components/admin/store-toggle";
 import type { AdminProfile } from "@/lib/admin";
 
 /** Admin app shell: midnight top bar + centered content column. */
 export function AdminShell({
   profile,
+  storeOpen,
   children,
 }: {
   profile: AdminProfile;
+  storeOpen: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -32,10 +35,11 @@ export function AdminShell({
               Admin
             </span>
           </Link>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-on-primary/70 sm:inline">
+          <div className="flex items-center gap-2.5">
+            <span className="hidden text-sm text-on-primary/70 md:inline">
               {profile.display_name}
             </span>
+            <StoreToggle initialOpen={storeOpen} />
             <form action={signOut}>
               <button className="rounded-lg px-2.5 py-1.5 text-sm text-on-primary/80 transition-colors hover:bg-white/10 hover:text-on-primary">
                 Sign out

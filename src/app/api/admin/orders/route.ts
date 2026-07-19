@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { ACTIVE_STATUSES } from "@/lib/order-status";
+import { BOARD_SELECT, BOARD_FILTER } from "@/lib/order-status";
 
 export const dynamic = "force-dynamic";
 
-const SELECT =
-  "id,daily_order_number,customer_name,customer_phone,status,total_paise,created_at,order_items(name_snapshot,quantity)";
-
-/** GET /api/admin/orders — active orders for the live board (admin only). */
+/** GET /api/admin/orders — board orders (active paid + cash-awaiting). Admin only. */
 export async function GET() {
   const supabase = await createClient();
 
@@ -29,8 +26,8 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("orders")
-    .select(SELECT)
-    .in("status", ACTIVE_STATUSES)
+    .select(BOARD_SELECT)
+    .or(BOARD_FILTER)
     .order("created_at", { ascending: true });
   if (error) {
     return NextResponse.json({ error: "query_failed" }, { status: 500 });

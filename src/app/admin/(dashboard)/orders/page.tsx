@@ -1,18 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
-import { ACTIVE_STATUSES, type BoardOrder } from "@/lib/order-status";
+import { BOARD_SELECT, BOARD_FILTER, type BoardOrder } from "@/lib/order-status";
 import { OrderBoard } from "@/components/admin/order-board";
 
 export const dynamic = "force-dynamic";
-
-const SELECT =
-  "id,daily_order_number,customer_name,customer_phone,status,total_paise,created_at,order_items(name_snapshot,quantity)";
 
 export default async function OrdersPage() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("orders")
-    .select(SELECT)
-    .in("status", ACTIVE_STATUSES)
+    .select(BOARD_SELECT)
+    .or(BOARD_FILTER)
     .order("created_at", { ascending: true });
 
   return (

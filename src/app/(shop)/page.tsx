@@ -1,6 +1,7 @@
 import { getMenu, type MenuItem } from "@/lib/menu";
 import { CustomerHero } from "@/components/customer-hero";
 import { AddToCart } from "@/components/cart/add-to-cart";
+import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { formatPaise } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -12,6 +13,8 @@ export default async function MenuPage() {
 
   return (
     <div className="flex min-h-full flex-col">
+      {/* Live menu: sold-out / price changes appear instantly. */}
+      <RealtimeRefresh table="menu_items" channel="menu" />
       <CustomerHero />
 
       <main className="relative z-10 -mt-5 flex-1 rounded-t-[1.75rem] bg-background px-5 pb-28 pt-7">

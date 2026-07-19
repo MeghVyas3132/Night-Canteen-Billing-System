@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
-import { setOrderStatus } from "@/lib/actions/order-status";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { setOrderStatus, confirmCashPayment } from "@/lib/actions/order-status";
+import { createClient } from "@/lib/supabase/client";
 import {
   STATUS_META,
   NEXT_ACTION,
@@ -13,12 +14,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
-const POLL_MS = 4000;
+const POLL_MS = 5000; // safety net; Realtime handles the instant path
+const STALE_MS = 30 * 60 * 1000; // unpaid > 30 min → greyed
 
 export function OrderBoard({ initial }: { initial: BoardOrder[] }) {
   const [orders, setOrders] = useState<BoardOrder[]>(initial);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [now, setNow] = useState(0);
 
   const refresh = useCallback(async () => {
     try {
@@ -27,10 +30,33 @@ export function OrderBoard({ initial }: { initial: BoardOrder[] }) {
       const data = (await res.json()) as { orders?: BoardOrder[] };
       if (Array.isArray(data.orders)) setOrders(data.orders);
     } catch {
-      // transient network error — the next tick retries
+      // transient — the next tick / realtime event recovers
     }
   }, []);
 
+  // Realtime: push updates the instant any order changes (any device).
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("admin-orders")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => refresh(),
+      )
+      .subscribe();
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) supabase.realtime.setAuth(data.session.access_token);
+    })();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refresh]);
+
+  // Fallback poll + refresh on tab focus.
   useEffect(() => {
     const id = setInterval(refresh, POLL_MS);
     const onVisible = () => {
@@ -43,10 +69,20 @@ export function OrderBoard({ initial }: { initial: BoardOrder[] }) {
     };
   }, [refresh]);
 
+  // Tick "now" for staleness / relative time — kept in state, out of render.
+  useEffect(() => {
+    const update = () => setNow(Date.now());
+    const t = setTimeout(update, 0);
+    const id = setInterval(update, 30000);
+    return () => {
+      clearTimeout(t);
+      clearInterval(id);
+    };
+  }, []);
+
   const advance = useCallback(
     (order: BoardOrder, to: OrderStatus) => {
       setError(null);
-      // Optimistic: completing/cancelling drops the card; otherwise re-label it.
       setOrders((prev) =>
         to === "completed" || to === "cancelled"
           ? prev.filter((o) => o.id !== order.id)
@@ -61,12 +97,45 @@ export function OrderBoard({ initial }: { initial: BoardOrder[] }) {
     [refresh],
   );
 
-  if (orders.length === 0) {
+  const cashReceived = useCallback(
+    (order: BoardOrder) => {
+      setError(null);
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === order.id
+            ? { ...o, payment_status: "paid", status: "new" }
+            : o,
+        ),
+      );
+      startTransition(async () => {
+        const res = await confirmCashPayment(order.id);
+        if (!res.ok) setError(res.error ?? "Couldn't confirm the cash payment.");
+        refresh();
+      });
+    },
+    [refresh],
+  );
+
+  // Cleared (paid) first, then cash-awaiting; oldest first within each group.
+  const sorted = useMemo(
+    () =>
+      [...orders].sort((a, b) => {
+        const ca = a.payment_status === "paid" ? 0 : 1;
+        const cb = b.payment_status === "paid" ? 0 : 1;
+        if (ca !== cb) return ca - cb;
+        return (
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      }),
+    [orders],
+  );
+
+  if (sorted.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border-strong bg-surface px-6 py-16 text-center">
         <p className="text-base font-medium text-foreground">No active orders</p>
         <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted">
-          Paid orders land here automatically. This board refreshes on its own.
+          Paid orders and cash orders awaiting payment land here automatically.
         </p>
       </div>
     );
@@ -79,12 +148,14 @@ export function OrderBoard({ initial }: { initial: BoardOrder[] }) {
           {error}
         </p>
       )}
-      {orders.map((order) => (
+      {sorted.map((order) => (
         <OrderCard
           key={order.id}
           order={order}
-          onAdvance={advance}
+          now={now}
           busy={pending}
+          onAdvance={advance}
+          onCashReceived={cashReceived}
         />
       ))}
     </div>
@@ -93,13 +164,21 @@ export function OrderBoard({ initial }: { initial: BoardOrder[] }) {
 
 function OrderCard({
   order,
-  onAdvance,
+  now,
   busy,
+  onAdvance,
+  onCashReceived,
 }: {
   order: BoardOrder;
-  onAdvance: (order: BoardOrder, to: OrderStatus) => void;
+  now: number;
   busy: boolean;
+  onAdvance: (order: BoardOrder, to: OrderStatus) => void;
+  onCashReceived: (order: BoardOrder) => void;
 }) {
+  const cleared = order.payment_status === "paid";
+  const cashPending = !cleared; // board only holds paid-active + cash-awaiting
+  const stale =
+    cashPending && now - new Date(order.created_at).getTime() > STALE_MS;
   const meta = STATUS_META[order.status];
   const next = NEXT_ACTION[order.status];
   const ready = order.status === "ready";
@@ -107,26 +186,41 @@ function OrderCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border bg-surface p-4 shadow-card",
-        ready ? "border-success/50 ring-1 ring-success/20" : "border-border",
+        "rounded-2xl border bg-surface p-4 shadow-card transition-opacity",
+        ready && "border-success/50 ring-1 ring-success/20",
+        !ready && cashPending && "border-accent/40",
+        !ready && cleared && "border-border",
+        stale && "opacity-55",
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-lg font-bold tabular-nums text-foreground">
               {order.daily_order_number ? `#${order.daily_order_number}` : "—"}
             </span>
-            <Badge tone={meta.tone} dot>
-              {meta.label}
-            </Badge>
+            {cashPending ? (
+              <Badge tone="accent" dot>
+                Cash · awaiting
+              </Badge>
+            ) : (
+              <Badge tone={meta.tone} dot>
+                {meta.label}
+              </Badge>
+            )}
+            {stale && (
+              <span className="text-xs font-medium text-danger">30+ min</span>
+            )}
           </div>
           <p className="mt-0.5 truncate text-sm font-medium text-foreground">
             {order.customer_name}
+            {order.customer_phone && (
+              <span className="font-normal text-muted"> · {order.customer_phone}</span>
+            )}
           </p>
         </div>
         <span className="shrink-0 text-xs text-muted">
-          {timeAgo(order.created_at)}
+          {timeAgo(order.created_at, now)}
         </span>
       </div>
 
@@ -157,15 +251,26 @@ function OrderCard({
           >
             Cancel
           </button>
-          {next && (
+          {cashPending ? (
             <Button
               size="sm"
-              variant={ready ? "accent" : "primary"}
-              onClick={() => onAdvance(order, next.to)}
+              variant="accent"
+              onClick={() => onCashReceived(order)}
               disabled={busy}
             >
-              {next.label}
+              Cash received
             </Button>
+          ) : (
+            next && (
+              <Button
+                size="sm"
+                variant={ready ? "accent" : "primary"}
+                onClick={() => onAdvance(order, next.to)}
+                disabled={busy}
+              >
+                {next.label}
+              </Button>
+            )
           )}
         </div>
       </div>
@@ -173,8 +278,8 @@ function OrderCard({
   );
 }
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
+function timeAgo(iso: string, now: number): string {
+  const diffMs = now - new Date(iso).getTime();
   const mins = Math.floor(diffMs / 60000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;

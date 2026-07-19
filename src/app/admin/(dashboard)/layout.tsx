@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/env";
+import { getStoreOpen } from "@/lib/store";
 import { signOut } from "@/lib/actions/auth";
 import { AdminShell } from "@/components/admin/admin-shell";
 import type { AdminProfile } from "@/lib/admin";
@@ -66,7 +67,11 @@ export default async function DashboardLayout({
     );
   }
 
+  const storeOpen = await getStoreOpen();
+
   return (
-    <AdminShell profile={profile as AdminProfile}>{children}</AdminShell>
+    <AdminShell profile={profile as AdminProfile} storeOpen={storeOpen}>
+      {children}
+    </AdminShell>
   );
 }

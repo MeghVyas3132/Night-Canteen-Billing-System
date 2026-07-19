@@ -46,13 +46,24 @@ export const CUSTOMER_STEPS: { status: OrderStatus; label: string }[] = [
   { status: "ready", label: "Ready" },
 ];
 
+export type PaymentStatus = "created" | "paid" | "failed" | "refunded";
+
 export type BoardOrder = {
   id: string;
   daily_order_number: number | null;
   customer_name: string;
   customer_phone: string | null;
   status: OrderStatus;
+  payment_status: PaymentStatus;
+  payment_method: "upi" | "cash" | null;
   total_paise: number;
   created_at: string;
   order_items: { name_snapshot: string; quantity: number }[];
 };
+
+// Board query: active paid orders + cash orders awaiting counter payment.
+export const BOARD_SELECT =
+  "id,daily_order_number,customer_name,customer_phone,status,payment_status,payment_method,total_paise,created_at,order_items(name_snapshot,quantity)";
+export const BOARD_FILTER =
+  "status.in.(new,preparing,ready),and(status.eq.pending_payment,payment_method.eq.cash)";
+

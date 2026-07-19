@@ -29,7 +29,7 @@ export default async function OrderPage({
   const { data: order } = await supabase
     .from("orders")
     .select(
-      "id,session_id,customer_name,status,payment_status,subtotal_paise,total_paise,daily_order_number,created_at",
+      "id,session_id,customer_name,status,payment_status,payment_method,subtotal_paise,total_paise,daily_order_number,created_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -45,14 +45,15 @@ export default async function OrderPage({
   const status = (order.status as OrderStatus) ?? "pending_payment";
   const meta = STATUS_META[status];
   const pending = status === "pending_payment";
+  const cash = order.payment_method === "cash";
   const done = status === "completed" || status === "cancelled";
   const activeStep = CUSTOMER_STEPS.findIndex((s) => s.status === status);
   const showSteps = ["new", "preparing", "ready"].includes(status);
 
   return (
     <div className="flex min-h-full flex-col">
-      {/* Poll for status changes until the order is finished. */}
-      <AutoRefresh stop={done || pending} />
+      {/* Poll for status changes until the order is finished (incl. cash confirmation). */}
+      <AutoRefresh intervalMs={2500} stop={done} />
 
       <header className="bg-primary-deep text-on-primary">
         <div className="mx-auto flex max-w-lg items-center gap-2.5 px-5 py-4">
@@ -87,8 +88,9 @@ export default async function OrderPage({
 
           {pending && (
             <div className="mt-4 rounded-xl bg-accent/12 px-4 py-3 text-sm text-on-accent">
-              Waiting to confirm your payment. If you&rsquo;ve just paid, this
-              will update in a moment.
+              {cash
+                ? "Pay at the counter — we'll start your order the moment the staff confirm your cash."
+                : "Waiting to confirm your payment. If you've just paid, this will update in a moment."}
             </div>
           )}
 

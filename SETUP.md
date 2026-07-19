@@ -36,7 +36,8 @@ Easiest: in the Supabase dashboard → **SQL Editor** → **New query**, paste *
 2. [`0002_admin.sql`](supabase/migrations/0002_admin.sql) — admin profiles, audit log, `is_admin()`, admin write policies.
 3. [`0003_orders.sql`](supabase/migrations/0003_orders.sql) — customer sessions, orders, order items.
 4. [`0004_payment.sql`](supabase/migrations/0004_payment.sql) — atomic daily order number.
-5. [`seed.sql`](supabase/seed.sql) — sample menu.
+5. [`0005_ops.sql`](supabase/migrations/0005_ops.sql) — cash payments, store open/closed, Realtime.
+6. [`seed.sql`](supabase/seed.sql) — sample menu.
 </details>
 
 ## 4b. Create an admin (staff) account
@@ -80,4 +81,6 @@ You can also hit the JSON probe: http://localhost:3000/api/health
 - **M1:** customer menu browse + admin login + menu management. ✅
 - **M2:** customer session, cart with quantities, checkout (server-side pricing). ✅
 - **M3:** Razorpay UPI payment (pay upfront) — paid orders enter the kitchen queue. ✅
-- **M4 (next):** live order board + status flow (staff + customer).
+- **M4:** live order board + status flow (staff + customer). ✅
+- **M5:** cash + UPI, store open/closed, board polish, Realtime. ✅ *(run `0005`)*
+- **Next:** admin hardening (rate-limit + Turnstile + TOTP), analytics, menu polish.

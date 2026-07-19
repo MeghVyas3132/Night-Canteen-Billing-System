@@ -5,17 +5,20 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ensureSession } from "@/lib/session";
 import { isSupabaseConfigured, isRazorpayConfigured } from "@/lib/env";
 import { createRazorpayOrder, razorpayKeyId } from "@/lib/razorpay";
+import { getStoreOpen } from "@/lib/store";
 
 export type CreateOrderInput = {
   items: { id: string; qty: number }[];
   name: string;
   phone?: string;
+  paymentMethod: "upi" | "cash";
   idempotencyKey: string;
 };
 
 export type CreateOrderResult =
   | { error: string }
   | { alreadyPaid: true; orderId: string }
+  | { cash: true; orderId: string }
   | {
       orderId: string;
       razorpayOrderId: string;
@@ -38,17 +41,27 @@ export async function createOrder(
   if (!isSupabaseConfigured()) {
     return { error: "Ordering isn't available yet. Please try again later." };
   }
-  if (!isRazorpayConfigured()) {
-    return { error: "Payments aren't set up yet. Please try again soon." };
+
+  const method: "upi" | "cash" =
+    input.paymentMethod === "cash" ? "cash" : "upi";
+  if (method === "upi" && !isRazorpayConfigured()) {
+    return { error: "UPI payments aren't set up yet. Please try again soon." };
+  }
+
+  if (!(await getStoreOpen())) {
+    return {
+      error: "The canteen just closed — you can't place an order right now.",
+    };
   }
 
   const name = (input.name ?? "").trim();
   if (!name) return { error: "Please enter your name." };
   if (name.length > 60) return { error: "That name is too long." };
 
-  const phone = (input.phone ?? "").trim() || null;
-  if (phone && !/^[0-9+\-\s]{6,15}$/.test(phone)) {
-    return { error: "Enter a valid phone number, or leave it blank." };
+  const phone = (input.phone ?? "").trim();
+  if (!phone) return { error: "Please enter your phone number." };
+  if (!/^[0-9+\-\s]{6,15}$/.test(phone)) {
+    return { error: "Enter a valid phone number." };
   }
 
   const supabase = createAdminClient();
@@ -58,13 +71,16 @@ export async function createOrder(
     const { data: existing } = await supabase
       .from("orders")
       .select(
-        "id,total_paise,payment_status,razorpay_order_id,customer_name,customer_phone",
+        "id,total_paise,payment_status,payment_method,razorpay_order_id,customer_name,customer_phone",
       )
       .eq("idempotency_key", input.idempotencyKey)
       .maybeSingle();
     if (existing) {
       if (existing.payment_status === "paid") {
         return { alreadyPaid: true, orderId: existing.id };
+      }
+      if (existing.payment_method === "cash") {
+        return { cash: true, orderId: existing.id };
       }
       const rzpId = await ensureRazorpayOrder(supabase, existing.id, existing.razorpay_order_id, existing.total_paise);
       if (!rzpId) return { error: "Couldn't start the payment. Please try again." };
@@ -144,6 +160,7 @@ export async function createOrder(
       customer_phone: phone,
       status: "pending_payment",
       payment_status: "created",
+      payment_method: method,
       subtotal_paise: subtotal,
       total_paise: total,
       idempotency_key: input.idempotencyKey || null,
@@ -169,6 +186,11 @@ export async function createOrder(
   if (itemsInsertErr) {
     await supabase.from("orders").delete().eq("id", order.id);
     return { error: "Couldn't place your order. Please try again." };
+  }
+
+  // Cash: order waits on the board for staff to confirm receipt.
+  if (method === "cash") {
+    return { cash: true, orderId: order.id };
   }
 
   const rzpId = await ensureRazorpayOrder(supabase, order.id, null, total);
