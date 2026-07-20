@@ -7,6 +7,8 @@ import { cn } from "@/lib/cn";
 import { AvailabilityToggle } from "@/components/admin/availability-toggle";
 import { DeleteItemButton } from "@/components/admin/delete-item-button";
 import { AddCategoryForm } from "@/components/admin/add-category-form";
+import { CategoryHeader } from "@/components/admin/category-header";
+import { MoveButtons } from "@/components/admin/move-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +46,7 @@ export default async function AdminMenuPage() {
         <div>
           <h1 className="text-xl font-semibold text-foreground">Menu</h1>
           <p className="mt-0.5 text-sm text-muted">
-            {total} item{total === 1 ? "" : "s"} · tap the switch to mark sold out
+            {total} item{total === 1 ? "" : "s"} · reorder with the arrows
           </p>
         </div>
         <Link href="/admin/menu/new" className={buttonClasses({ size: "md" })}>
@@ -60,12 +62,30 @@ export default async function AdminMenuPage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-5">
-          {cats.map((cat) => (
-            <CategoryBlock key={cat.id} name={cat.name} items={byCat(cat.id)} />
+        <div className="space-y-6">
+          {cats.map((cat, i) => (
+            <section key={cat.id}>
+              <CategoryHeader
+                id={cat.id}
+                name={cat.name}
+                count={byCat(cat.id).length}
+                isFirst={i === 0}
+                isLast={i === cats.length - 1}
+              />
+              <ItemList items={byCat(cat.id)} />
+            </section>
           ))}
+
           {uncategorized.length > 0 && (
-            <CategoryBlock name="Uncategorized" items={uncategorized} />
+            <section>
+              <div className="mb-2 flex items-center gap-2 px-1">
+                <h2 className="text-base font-semibold text-foreground">
+                  Uncategorized
+                </h2>
+                <span className="text-xs text-muted">{uncategorized.length}</span>
+              </div>
+              <ItemList items={uncategorized} />
+            </section>
           )}
         </div>
       )}
@@ -78,36 +98,45 @@ export default async function AdminMenuPage() {
   );
 }
 
-function CategoryBlock({ name, items }: { name: string; items: Item[] }) {
-  return (
-    <section>
-      <div className="mb-2 flex items-center gap-2 px-1">
-        <h2 className="text-base font-semibold text-foreground">{name}</h2>
-        <span className="text-xs text-muted">{items.length}</span>
+function ItemList({ items }: { items: Item[] }) {
+  if (items.length === 0) {
+    return (
+      <div className="rounded-2xl border border-border bg-surface px-4 py-5 text-sm text-muted">
+        No items in this category yet.
       </div>
-      {items.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-surface px-4 py-5 text-sm text-muted">
-          No items in this category yet.
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
-          {items.map((item, i) => (
-            <ItemRow key={item.id} item={item} first={i === 0} />
-          ))}
-        </div>
-      )}
-    </section>
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
+      {items.map((item, i) => (
+        <ItemRow
+          key={item.id}
+          item={item}
+          isFirst={i === 0}
+          isLast={i === items.length - 1}
+        />
+      ))}
+    </div>
   );
 }
 
-function ItemRow({ item, first }: { item: Item; first: boolean }) {
+function ItemRow({
+  item,
+  isFirst,
+  isLast,
+}: {
+  item: Item;
+  isFirst: boolean;
+  isLast: boolean;
+}) {
   return (
     <div
       className={cn(
-        "flex items-center gap-2.5 px-4 py-3",
-        !first && "border-t border-border",
+        "flex items-center gap-2 px-3 py-3",
+        !isFirst && "border-t border-border",
       )}
     >
+      <MoveButtons id={item.id} kind="item" isFirst={isFirst} isLast={isLast} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span
