@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
+import { Signature } from "@/components/signature";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,6 +24,8 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: "Night Canteen",
   description: "Scan, order, and pay at the Night Canteen food truck.",
+  authors: [{ name: "Megh Vyas" }],
+  creator: "Megh Vyas",
 };
 
 export default function RootLayout({
@@ -35,8 +38,12 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <body
+        data-author="Megh Vyas"
+        className="min-h-full flex flex-col bg-background text-foreground"
+      >
         {children}
+        <Signature />
       </body>
     </html>
   );
