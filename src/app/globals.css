@@ -92,6 +92,15 @@ body {
   }
 }
 
+/* Horizontal scroll rows (category filter) without a visible scrollbar. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Motion is opt-in to state changes; respect reduced motion everywhere. */
 @media (prefers-reduced-motion: reduce) {
   *,
