@@ -39,8 +39,12 @@ export function MenuBrowser({
       </div>
 
       <div className="mx-auto max-w-lg space-y-10 px-6 pt-3">
-        {shown.map((category) => (
-          <section key={category.id}>
+        {shown.map((category, i) => (
+          <section
+            key={category.id}
+            className="animate-enter"
+            style={{ animationDelay: `${Math.min(i, 6) * 55}ms` }}
+          >
             <div className="mb-1 flex items-baseline gap-3">
               <h2 className="font-display text-xl font-medium tracking-tight text-foreground">
                 {category.name}
@@ -74,7 +78,7 @@ function Pill({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        "shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium transition-[transform,background-color,color] duration-150 ease-[var(--ease-out-quart)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         active
           ? "bg-primary text-on-primary"
           : "border border-border bg-surface text-muted hover:text-foreground",

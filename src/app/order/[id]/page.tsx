@@ -67,7 +67,7 @@ export default async function OrderPage({
       </header>
 
       <main className="mx-auto w-full max-w-lg flex-1 px-5 py-7">
-        <div className="rounded-2xl border border-border bg-surface p-6 shadow-card">
+        <div className="animate-enter rounded-2xl border border-border bg-surface p-6 shadow-card">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm text-muted">
@@ -75,9 +75,12 @@ export default async function OrderPage({
                   ? `Order #${order.daily_order_number}`
                   : "Order placed"}
               </p>
-              <h1 className="mt-0.5 text-xl font-semibold text-foreground">
+              <h1
+                key={status}
+                className="mt-0.5 animate-enter text-xl font-semibold text-foreground"
+              >
                 {status === "ready"
-                  ? "Ready for pickup! 🎉"
+                  ? "Ready for pickup!"
                   : `Thanks, ${order.customer_name}`}
               </h1>
             </div>

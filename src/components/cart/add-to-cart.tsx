@@ -31,7 +31,7 @@ export function AddToCart({
         type="button"
         onClick={() => add({ id, name, price_paise: pricePaise })}
         aria-label={`Add ${name}`}
-        className="grid size-9 place-items-center rounded-full bg-accent text-on-accent shadow-sm transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="grid size-9 place-items-center rounded-full bg-accent text-on-accent shadow-sm transition-[transform,background-color] duration-150 ease-[var(--ease-out-quart)] hover:bg-accent-hover active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         <PlusIcon />
       </button>
@@ -70,7 +70,7 @@ function StepBtn({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="grid size-7 place-items-center rounded-full text-on-accent transition-colors hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+      className="grid size-7 place-items-center rounded-full text-on-accent transition-[transform,background-color] duration-150 hover:bg-accent/25 active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
     >
       {children}
     </button>

@@ -17,10 +17,7 @@ export default async function OrdersPage() {
       <div className="mb-4 flex items-center gap-2">
         <h1 className="text-xl font-semibold text-foreground">Orders</h1>
         <span className="flex items-center gap-1.5 text-xs text-muted">
-          <span className="relative flex size-2">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
-            <span className="relative inline-flex size-2 rounded-full bg-success" />
-          </span>
+          <span className="size-2 rounded-full bg-success" />
           Live
         </span>
       </div>

@@ -3,20 +3,26 @@
 import { useState } from "react";
 import { useCart, lineKey } from "@/components/cart/cart-provider";
 import { formatPaise } from "@/lib/format";
-import { cn } from "@/lib/cn";
 import type { MenuItem, MenuVariant } from "@/lib/menu";
 
 /** Trigger for a variant item: opens a bottom sheet to pick a size. */
 export function SizePicker({ item }: { item: MenuItem }) {
   const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
   const { qtyOfItem } = useCart();
   const totalQty = qtyOfItem(item.id);
   const available = item.variants.filter((v) => v.is_available);
 
+  function close() {
+    setClosing(true);
+    window.setTimeout(() => {
+      setOpen(false);
+      setClosing(false);
+    }, 220);
+  }
+
   if (!item.is_available || available.length === 0) {
-    return (
-      <span className="text-xs font-medium text-danger">Sold out</span>
-    );
+    return <span className="text-xs font-medium text-danger">Sold out</span>;
   }
 
   return (
@@ -25,7 +31,7 @@ export function SizePicker({ item }: { item: MenuItem }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`Choose a size for ${item.name}`}
-        className="relative grid size-9 place-items-center rounded-full bg-accent text-on-accent shadow-sm transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="relative grid size-9 place-items-center rounded-full bg-accent text-on-accent shadow-sm transition-[transform,background-color] duration-150 ease-[var(--ease-out-quart)] hover:bg-accent-hover active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         <PlusIcon />
         {totalQty > 0 && (
@@ -38,7 +44,8 @@ export function SizePicker({ item }: { item: MenuItem }) {
         <SizeSheet
           item={item}
           variants={available}
-          onClose={() => setOpen(false)}
+          closing={closing}
+          onClose={close}
         />
       )}
     </>
@@ -48,10 +55,12 @@ export function SizePicker({ item }: { item: MenuItem }) {
 function SizeSheet({
   item,
   variants,
+  closing,
   onClose,
 }: {
   item: MenuItem;
   variants: MenuVariant[];
+  closing: boolean;
   onClose: () => void;
 }) {
   const { qtyOf, add, setQty } = useCart();
@@ -68,9 +77,18 @@ function SizeSheet({
         aria-label="Close"
         onClick={onClose}
         className="absolute inset-0 bg-primary-deep/50"
+        style={{
+          animation: closing
+            ? "nc-fade-in 0.2s ease 0s 1 reverse forwards"
+            : "nc-fade-in 0.2s ease both",
+        }}
       />
       <div
-        style={{ animation: "nc-slide-up 0.28s cubic-bezier(0.22,1,0.36,1)" }}
+        style={{
+          animation: closing
+            ? "nc-sheet-out 0.22s var(--ease-out-quart) both"
+            : "nc-slide-up 0.32s var(--ease-out-expo) both",
+        }}
         className="relative w-full max-w-lg rounded-t-3xl bg-surface p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-float"
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" />
@@ -102,7 +120,7 @@ function SizeSheet({
                     onClick={() =>
                       add({ id: item.id, variantId: v.id, name: displayName, price_paise: v.price_paise })
                     }
-                    className="h-9 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover"
+                    className="h-9 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent transition-[transform,background-color] duration-150 hover:bg-accent-hover active:scale-95"
                   >
                     Add
                   </button>
@@ -135,7 +153,7 @@ function SizeSheet({
         <button
           type="button"
           onClick={onClose}
-          className="mt-5 w-full rounded-xl bg-primary py-3 text-center font-medium text-on-primary transition-colors hover:bg-primary-hover"
+          className="mt-5 w-full rounded-xl bg-primary py-3 text-center font-medium text-on-primary transition-[transform,background-color] duration-150 hover:bg-primary-hover active:scale-[0.98]"
         >
           Done
         </button>
@@ -158,9 +176,7 @@ function StepBtn({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={cn(
-        "grid size-7 place-items-center rounded-full text-on-accent transition-colors hover:bg-accent/25",
-      )}
+      className="grid size-7 place-items-center rounded-full text-on-accent transition-[transform,background-color] duration-150 hover:bg-accent/25 active:scale-90"
     >
       {children}
     </button>

@@ -5,7 +5,8 @@ type Variant = "primary" | "accent" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-xl font-medium whitespace-nowrap transition-colors " +
+  "inline-flex items-center justify-center gap-2 rounded-xl font-medium whitespace-nowrap " +
+  "transition-[color,background-color,box-shadow,transform] duration-150 ease-[var(--ease-out-quart)] active:scale-[0.97] " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:ring-offset-2 " +
   "focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50";
 

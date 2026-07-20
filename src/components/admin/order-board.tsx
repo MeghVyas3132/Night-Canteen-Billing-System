@@ -186,7 +186,7 @@ function OrderCard({
   return (
     <div
       className={cn(
-        "rounded-2xl border bg-surface p-4 shadow-card transition-opacity",
+        "animate-enter rounded-2xl border bg-surface p-4 shadow-card transition-[opacity,box-shadow,border-color] duration-200",
         ready && "border-success/50 ring-1 ring-success/20",
         !ready && cashPending && "border-accent/40",
         !ready && cleared && "border-border",

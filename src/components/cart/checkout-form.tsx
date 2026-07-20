@@ -257,7 +257,7 @@ function MethodOption({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "rounded-xl border px-4 py-3 text-left transition-colors",
+        "rounded-xl border px-4 py-3 text-left transition-[transform,background-color,border-color,box-shadow] duration-150 active:scale-[0.98]",
         active
           ? "border-primary bg-primary/5 ring-1 ring-primary/30"
           : "border-border-strong hover:bg-surface-2",
@@ -285,7 +285,7 @@ function StepBtn({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="grid size-8 place-items-center rounded-md text-foreground transition-colors hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      className="grid size-8 place-items-center rounded-md text-foreground transition-[transform,background-color] duration-150 hover:bg-border active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
     >
       {children}
     </button>
