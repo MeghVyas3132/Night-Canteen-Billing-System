@@ -6,6 +6,7 @@ import { formatPaise } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { ReorderButton, type ReorderLine } from "@/components/cart/reorder-button";
 import { customerStatus, type OrderStatus } from "@/lib/order-status";
 import { cn } from "@/lib/cn";
 
@@ -40,7 +41,9 @@ export default async function OrderPage({
 
   const { data: items } = await supabase
     .from("order_items")
-    .select("name_snapshot,quantity,line_total_paise")
+    .select(
+      "menu_item_id,variant_id,name_snapshot,unit_price_paise_snapshot,quantity,line_total_paise",
+    )
     .eq("order_id", id)
     .order("name_snapshot");
 
@@ -142,12 +145,15 @@ export default async function OrderPage({
           </div>
         </div>
 
-        <Link
-          href="/"
-          className={cn(buttonClasses({ variant: "secondary", size: "md" }), "mt-5 w-full")}
-        >
-          Back to menu
-        </Link>
+        <div className="mt-5 space-y-2">
+          <ReorderButton lines={(items ?? []) as ReorderLine[]} />
+          <Link
+            href="/"
+            className={cn(buttonClasses({ variant: "secondary", size: "md" }), "w-full")}
+          >
+            Back to menu
+          </Link>
+        </div>
       </main>
     </div>
   );

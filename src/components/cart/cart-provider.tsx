@@ -40,7 +40,7 @@ type CartContextValue = {
   clear: () => void;
 };
 
-const STORAGE_KEY = "nc_cart_v2";
+export const CART_STORAGE_KEY = "nc_cart_v2";
 const MAX_QTY = 50;
 const EMPTY: CartLine[] = [];
 
@@ -53,7 +53,7 @@ function loadOnce() {
   if (loaded) return;
   loaded = true;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(CART_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) cartLines = parsed;
@@ -66,7 +66,7 @@ function loadOnce() {
 function commit(next: CartLine[]) {
   cartLines = next;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(next));
   } catch {
     // ignore quota / availability errors
   }

@@ -1,16 +1,19 @@
 import { getMenu } from "@/lib/menu";
+import { getActiveOrder } from "@/lib/customer-order";
 import { CustomerHero } from "@/components/customer-hero";
 import { RealtimeRefresh } from "@/components/realtime-refresh";
 import { MenuBrowser } from "@/components/menu-browser";
+import { ActiveOrderBar } from "@/components/cart/active-order-bar";
 
 export const dynamic = "force-dynamic";
 
 export default async function MenuPage() {
-  const menu = await getMenu();
+  const [menu, activeOrder] = await Promise.all([getMenu(), getActiveOrder()]);
   const hasMenu = menu.categories.length > 0;
 
   return (
     <div className="flex min-h-full flex-col">
+      {activeOrder && <ActiveOrderBar order={activeOrder} />}
       {/* Live menu: sold-out / price / size changes appear instantly. */}
       <RealtimeRefresh table="menu_items" channel="menu" />
       <RealtimeRefresh table="menu_item_variants" channel="menu-variants" />
