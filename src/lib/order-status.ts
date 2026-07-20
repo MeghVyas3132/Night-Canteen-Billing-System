@@ -17,13 +17,16 @@ export const STATUS_META: Record<OrderStatus, { label: string; tone: StatusTone 
   cancelled: { label: "Cancelled", tone: "danger" },
 };
 
-/** The single "advance" action available for each active status. */
+/**
+ * The single "advance" action for each active status. Simplified flow:
+ * New (to make) → Ready (call the number) → Collected. "Preparing" is retired.
+ */
 export const NEXT_ACTION: Partial<
   Record<OrderStatus, { to: OrderStatus; label: string }>
 > = {
-  new: { to: "preparing", label: "Start preparing" },
-  preparing: { to: "ready", label: "Mark ready" },
-  ready: { to: "completed", label: "Complete" },
+  new: { to: "ready", label: "Ready" },
+  preparing: { to: "ready", label: "Ready" }, // legacy safety
+  ready: { to: "completed", label: "Collected" },
 };
 
 /** Statuses that belong on the live board (paid, not yet done). */
@@ -32,19 +35,35 @@ export const ACTIVE_STATUSES: OrderStatus[] = ["new", "preparing", "ready"];
 /** Legal status transitions (validated server-side). */
 export const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   pending_payment: ["cancelled"],
-  new: ["preparing", "cancelled"],
+  new: ["ready", "cancelled"],
   preparing: ["ready", "cancelled"],
   ready: ["completed", "cancelled"],
   completed: [],
   cancelled: [],
 };
 
-/** Customer-facing progress steps. */
-export const CUSTOMER_STEPS: { status: OrderStatus; label: string }[] = [
-  { status: "new", label: "Received" },
-  { status: "preparing", label: "Preparing" },
-  { status: "ready", label: "Ready" },
-];
+/** Customer-facing status line (no multi-step stepper). */
+export function customerStatus(
+  status: OrderStatus,
+  method: "upi" | "cash" | null,
+): { label: string; tone: StatusTone } {
+  switch (status) {
+    case "pending_payment":
+      return method === "cash"
+        ? { label: "Pay at the counter", tone: "accent" }
+        : { label: "Confirming payment", tone: "accent" };
+    case "new":
+      return { label: "Preparing your order", tone: "primary" };
+    case "ready":
+      return { label: "Ready — collect at the counter", tone: "success" };
+    case "completed":
+      return { label: "Collected — enjoy!", tone: "neutral" };
+    case "cancelled":
+      return { label: "Cancelled", tone: "danger" };
+    default:
+      return { label: "Order placed", tone: "neutral" };
+  }
+}
 
 export type PaymentStatus = "created" | "paid" | "failed" | "refunded";
 
