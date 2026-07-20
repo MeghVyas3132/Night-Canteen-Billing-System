@@ -11,8 +11,9 @@ export default async function MenuPage() {
 
   return (
     <div className="flex min-h-full flex-col">
-      {/* Live menu: sold-out / price changes appear instantly. */}
+      {/* Live menu: sold-out / price / size changes appear instantly. */}
       <RealtimeRefresh table="menu_items" channel="menu" />
+      <RealtimeRefresh table="menu_item_variants" channel="menu-variants" />
       <CustomerHero />
 
       <main className="relative z-10 -mt-5 flex-1 rounded-t-[1.75rem] bg-background pb-28 pt-1">

@@ -9,31 +9,42 @@ import {
 } from "react";
 
 export type CartLine = {
-  id: string;
-  name: string;
+  id: string; // menu_item id
+  variantId: string | null; // size variant, or null
+  name: string; // display name (item, or "item — size")
   price_paise: number;
   qty: number;
 };
+
+export type AddItem = {
+  id: string;
+  variantId?: string | null;
+  name: string;
+  price_paise: number;
+};
+
+/** Composite key so each item+size is its own line. */
+export const lineKey = (id: string, variantId: string | null) =>
+  `${id}::${variantId ?? ""}`;
 
 type CartContextValue = {
   lines: CartLine[];
   count: number;
   subtotalPaise: number;
   hydrated: boolean;
-  qtyOf: (id: string) => number;
-  add: (item: { id: string; name: string; price_paise: number }) => void;
-  setQty: (id: string, qty: number) => void;
-  remove: (id: string) => void;
+  qtyOf: (id: string, variantId?: string | null) => number;
+  qtyOfItem: (id: string) => number;
+  add: (item: AddItem) => void;
+  setQty: (key: string, qty: number) => void;
+  remove: (key: string) => void;
   clear: () => void;
 };
 
-const STORAGE_KEY = "nc_cart_v1";
+const STORAGE_KEY = "nc_cart_v2";
 const MAX_QTY = 50;
 const EMPTY: CartLine[] = [];
 
-// ---- Module-level store (localStorage-backed) -------------------------------
-// A useSyncExternalStore source: SSR-safe (server snapshot is empty), no effects,
-// and referentially stable between mutations so React doesn't loop.
+// ---- Module-level store (localStorage-backed, useSyncExternalStore source) ---
 let cartLines: CartLine[] = EMPTY;
 let loaded = false;
 const listeners = new Set<() => void>();
@@ -76,36 +87,42 @@ function getServerSnapshot() {
   return EMPTY;
 }
 
-function addLine(item: { id: string; name: string; price_paise: number }) {
+function addLine(item: AddItem) {
   loadOnce();
-  const existing = cartLines.find((l) => l.id === item.id);
+  const variantId = item.variantId ?? null;
+  const existing = cartLines.find(
+    (l) => l.id === item.id && l.variantId === variantId,
+  );
   commit(
     existing
       ? cartLines.map((l) =>
-          l.id === item.id ? { ...l, qty: Math.min(l.qty + 1, MAX_QTY) } : l,
+          l.id === item.id && l.variantId === variantId
+            ? { ...l, qty: Math.min(l.qty + 1, MAX_QTY) }
+            : l,
         )
-      : [...cartLines, { ...item, qty: 1 }],
+      : [...cartLines, { id: item.id, variantId, name: item.name, price_paise: item.price_paise, qty: 1 }],
   );
 }
-function setLineQty(id: string, qty: number) {
+function setLineQty(key: string, qty: number) {
   loadOnce();
   commit(
     qty <= 0
-      ? cartLines.filter((l) => l.id !== id)
+      ? cartLines.filter((l) => lineKey(l.id, l.variantId) !== key)
       : cartLines.map((l) =>
-          l.id === id ? { ...l, qty: Math.min(qty, MAX_QTY) } : l,
+          lineKey(l.id, l.variantId) === key
+            ? { ...l, qty: Math.min(qty, MAX_QTY) }
+            : l,
         ),
   );
 }
-function removeLine(id: string) {
+function removeLine(key: string) {
   loadOnce();
-  commit(cartLines.filter((l) => l.id !== id));
+  commit(cartLines.filter((l) => lineKey(l.id, l.variantId) !== key));
 }
 function clearLines() {
   commit([]);
 }
 
-// "Am I hydrated" as a store: false on the server, true on the client.
 const noopSubscribe = () => () => {};
 const getTrue = () => true;
 const getFalse = () => false;
@@ -123,7 +140,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [lines],
   );
   const qtyOf = useCallback(
-    (id: string) => lines.find((l) => l.id === id)?.qty ?? 0,
+    (id: string, variantId: string | null = null) =>
+      lines.find((l) => l.id === id && l.variantId === variantId)?.qty ?? 0,
+    [lines],
+  );
+  const qtyOfItem = useCallback(
+    (id: string) =>
+      lines.reduce((n, l) => (l.id === id ? n + l.qty : n), 0),
     [lines],
   );
 
@@ -134,12 +157,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       subtotalPaise,
       hydrated,
       qtyOf,
+      qtyOfItem,
       add: addLine,
       setQty: setLineQty,
       remove: removeLine,
       clear: clearLines,
     }),
-    [lines, count, subtotalPaise, hydrated, qtyOf],
+    [lines, count, subtotalPaise, hydrated, qtyOf, qtyOfItem],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

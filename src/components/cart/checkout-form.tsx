@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useCart } from "@/components/cart/cart-provider";
+import { useCart, lineKey } from "@/components/cart/cart-provider";
 import { createOrder } from "@/lib/actions/order";
 import { verifyPayment } from "@/lib/actions/payment";
 import { loadRazorpay, UPI_ONLY_CONFIG } from "@/components/cart/razorpay-checkout";
@@ -56,7 +56,7 @@ export function CheckoutForm() {
     setBusy(true);
 
     const res = await createOrder({
-      items: lines.map((l) => ({ id: l.id, qty: l.qty })),
+      items: lines.map((l) => ({ id: l.id, variantId: l.variantId, qty: l.qty })),
       name: name.trim(),
       phone: phone.trim(),
       paymentMethod: method,
@@ -123,9 +123,11 @@ export function CheckoutForm() {
   return (
     <div className="space-y-6">
       <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
-        {lines.map((line, i) => (
+        {lines.map((line, i) => {
+          const key = lineKey(line.id, line.variantId);
+          return (
           <div
-            key={line.id}
+            key={key}
             className={cn(
               "flex items-center gap-3 px-4 py-3",
               i > 0 && "border-t border-border",
@@ -140,13 +142,13 @@ export function CheckoutForm() {
               </p>
             </div>
             <div className="flex items-center gap-1 rounded-lg bg-surface-2 p-0.5">
-              <StepBtn label={`Remove one ${line.name}`} onClick={() => setQty(line.id, line.qty - 1)}>
+              <StepBtn label={`Remove one ${line.name}`} onClick={() => setQty(key, line.qty - 1)}>
                 <MinusIcon />
               </StepBtn>
               <span className="min-w-6 text-center text-sm font-semibold tabular-nums text-foreground">
                 {line.qty}
               </span>
-              <StepBtn label={`Add another ${line.name}`} onClick={() => setQty(line.id, line.qty + 1)}>
+              <StepBtn label={`Add another ${line.name}`} onClick={() => setQty(key, line.qty + 1)}>
                 <PlusIcon />
               </StepBtn>
             </div>
@@ -154,7 +156,8 @@ export function CheckoutForm() {
               {formatPaise(line.price_paise * line.qty)}
             </div>
           </div>
-        ))}
+          );
+        })}
       </section>
 
       <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3.5 shadow-card">

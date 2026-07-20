@@ -1,5 +1,6 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getCurrentAdmin } from "@/lib/admin";
@@ -63,6 +64,46 @@ function validateItem(
   };
 }
 
+/** Parses the item form's size variants (JSON of {name, price} in rupees). */
+function parseVariants(
+  formData: FormData,
+): { name: string; price_paise: number }[] {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(String(formData.get("variants") ?? "[]"));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(raw)) return [];
+  const out: { name: string; price_paise: number }[] = [];
+  for (const r of raw) {
+    const name = String((r as { name?: unknown })?.name ?? "").trim();
+    const price = Number((r as { price?: unknown })?.price);
+    if (!name || !Number.isFinite(price) || price < 0) continue;
+    out.push({ name: name.slice(0, 40), price_paise: Math.round(price * 100) });
+  }
+  return out;
+}
+
+/** Replaces an item's variants (best-effort; won't fail item CRUD). */
+async function syncVariants(
+  supabase: SupabaseClient,
+  itemId: string,
+  variants: { name: string; price_paise: number }[],
+) {
+  await supabase.from("menu_item_variants").delete().eq("item_id", itemId);
+  if (variants.length > 0) {
+    await supabase.from("menu_item_variants").insert(
+      variants.map((v, i) => ({
+        item_id: itemId,
+        name: v.name,
+        price_paise: v.price_paise,
+        sort_order: i,
+      })),
+    );
+  }
+}
+
 function revalidateMenu() {
   revalidatePath("/admin/menu");
   revalidatePath("/");
@@ -107,6 +148,8 @@ export async function createItem(
     after: result.data,
   });
 
+  await syncVariants(admin.supabase, data.id, parseVariants(formData));
+
   revalidateMenu();
   redirect("/admin/menu");
 }
@@ -146,6 +189,8 @@ export async function updateItem(
     before,
     after: result.data,
   });
+
+  await syncVariants(admin.supabase, id, parseVariants(formData));
 
   revalidateMenu();
   redirect("/admin/menu");

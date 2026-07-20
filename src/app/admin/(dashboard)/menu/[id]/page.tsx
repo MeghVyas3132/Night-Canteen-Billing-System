@@ -14,14 +14,20 @@ export default async function EditItemPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: item }, { data: categories }] = await Promise.all([
-    supabase
-      .from("menu_items")
-      .select("id,name,description,price_paise,is_available,category_id")
-      .eq("id", id)
-      .maybeSingle(),
-    supabase.from("menu_categories").select("id,name").order("sort_order"),
-  ]);
+  const [{ data: item }, { data: categories }, { data: variants }] =
+    await Promise.all([
+      supabase
+        .from("menu_items")
+        .select("id,name,description,price_paise,is_available,category_id")
+        .eq("id", id)
+        .maybeSingle(),
+      supabase.from("menu_categories").select("id,name").order("sort_order"),
+      supabase
+        .from("menu_item_variants")
+        .select("name,price_paise,sort_order")
+        .eq("item_id", id)
+        .order("sort_order"),
+    ]);
 
   if (!item) notFound();
 
@@ -32,7 +38,7 @@ export default async function EditItemPage({
         <ItemForm
           action={updateItem}
           categories={categories ?? []}
-          values={item}
+          values={{ ...item, variants: variants ?? [] }}
           submitLabel="Save changes"
         />
       </div>

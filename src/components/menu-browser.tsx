@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AddToCart } from "@/components/cart/add-to-cart";
+import { SizePicker } from "@/components/cart/size-picker";
 import { formatPaise } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { MenuCategoryWithItems, MenuItem } from "@/lib/menu";
@@ -86,6 +87,16 @@ function Pill({
 
 function ItemRow({ item }: { item: MenuItem }) {
   const soldOut = !item.is_available;
+  const hasVariants = item.variants.length > 0;
+  const availablePrices = item.variants
+    .filter((v) => v.is_available)
+    .map((v) => v.price_paise);
+  const fromPrice = availablePrices.length
+    ? Math.min(...availablePrices)
+    : item.variants.length
+      ? Math.min(...item.variants.map((v) => v.price_paise))
+      : item.price_paise;
+
   return (
     <div className="flex items-start justify-between gap-5 py-4">
       <div className={cn("min-w-0 pt-0.5", soldOut && "opacity-55")}>
@@ -98,16 +109,21 @@ function ItemRow({ item }: { item: MenuItem }) {
           </p>
         )}
         <p className="mt-1.5 text-sm font-medium tabular-nums text-foreground">
-          {formatPaise(item.price_paise)}
+          {hasVariants && <span className="text-muted">from </span>}
+          {formatPaise(hasVariants ? fromPrice : item.price_paise)}
         </p>
       </div>
       <div className="shrink-0 pt-0.5">
-        <AddToCart
-          id={item.id}
-          name={item.name}
-          pricePaise={item.price_paise}
-          available={item.is_available}
-        />
+        {hasVariants ? (
+          <SizePicker item={item} />
+        ) : (
+          <AddToCart
+            id={item.id}
+            name={item.name}
+            pricePaise={item.price_paise}
+            available={item.is_available}
+          />
+        )}
       </div>
     </div>
   );

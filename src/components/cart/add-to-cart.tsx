@@ -1,6 +1,6 @@
 "use client";
 
-import { useCart } from "./cart-provider";
+import { useCart, lineKey } from "./cart-provider";
 
 /** Circular add button that becomes a compact −/qty/＋ stepper once in the cart. */
 export function AddToCart({
@@ -40,7 +40,7 @@ export function AddToCart({
 
   return (
     <div className="flex items-center gap-0.5 rounded-full bg-accent/12 p-0.5">
-      <StepBtn label={`Remove one ${name}`} onClick={() => setQty(id, qty - 1)}>
+      <StepBtn label={`Remove one ${name}`} onClick={() => setQty(lineKey(id, null), qty - 1)}>
         <MinusIcon />
       </StepBtn>
       <span className="min-w-6 text-center text-sm font-semibold tabular-nums text-on-accent">
