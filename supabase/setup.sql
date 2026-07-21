@@ -391,6 +391,16 @@ begin
 end $$;
 
 -- ============================================================================
+-- 0007_counter.sql  —  Night Canteen (staff-side counter billing)
+-- Tags where an order came from so staff can bill walk-up/verbal customers who
+-- don't scan the QR. Run after 0006_variants.sql.
+-- ============================================================================
+
+alter table public.orders
+  add column if not exists source text not null default 'qr'
+  check (source in ('qr', 'counter'));
+
+-- ============================================================================
 -- seed.sql  —  Sample Night Canteen menu for local/dev.
 -- Idempotent: fixed UUIDs + ON CONFLICT DO NOTHING, so it's safe to re-run.
 -- Run in the Supabase SQL editor after 0001_menu.sql (see SETUP.md).

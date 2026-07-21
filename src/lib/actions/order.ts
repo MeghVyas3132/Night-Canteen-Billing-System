@@ -6,6 +6,7 @@ import { ensureSession } from "@/lib/session";
 import { isSupabaseConfigured, isRazorpayConfigured } from "@/lib/env";
 import { createRazorpayOrder, razorpayKeyId } from "@/lib/razorpay";
 import { getStoreOpen } from "@/lib/store";
+import { priceLines } from "@/lib/pricing";
 
 export type CreateOrderInput = {
   items: { id: string; variantId?: string | null; qty: number }[];
@@ -27,8 +28,6 @@ export type CreateOrderResult =
       customerName: string;
       phone: string | null;
     };
-
-const MAX_QTY_PER_ITEM = 50;
 
 /**
  * Creates (or re-uses, for retries) a pending order + its Razorpay order.
@@ -95,106 +94,17 @@ export async function createOrder(
     }
   }
 
-  // New order: sanitize quantities, keyed by item + size variant.
-  const wanted = new Map<
-    string,
-    { itemId: string; variantId: string | null; qty: number }
-  >();
-  for (const it of Array.isArray(input.items) ? input.items : []) {
-    if (typeof it?.id !== "string") continue;
-    const variantId = typeof it.variantId === "string" ? it.variantId : null;
-    const q = Math.floor(Number(it.qty));
-    if (!Number.isFinite(q) || q < 1) continue;
-    if (q > MAX_QTY_PER_ITEM) {
-      return { error: "Please keep the quantity of any one item reasonable." };
-    }
-    const key = `${it.id}::${variantId ?? ""}`;
-    const prev = wanted.get(key);
-    wanted.set(key, {
-      itemId: it.id,
-      variantId,
-      qty: Math.min((prev?.qty ?? 0) + q, MAX_QTY_PER_ITEM),
-    });
-  }
-  const lines = [...wanted.values()];
-  if (lines.length === 0) return { error: "Your cart is empty." };
-
-  // Authoritative item + variant data from the DB.
-  const itemIds = [...new Set(lines.map((l) => l.itemId))];
-  const [{ data: dbItems, error: itemsErr }, { data: dbVariants }] =
-    await Promise.all([
-      supabase
-        .from("menu_items")
-        .select("id,name,price_paise,is_available")
-        .in("id", itemIds),
-      supabase
-        .from("menu_item_variants")
-        .select("id,item_id,name,price_paise,is_available")
-        .in("item_id", itemIds),
-    ]);
-  if (itemsErr) return { error: "Something went wrong. Please try again." };
-
-  const itemById = new Map((dbItems ?? []).map((i) => [i.id, i]));
-  const variantById = new Map((dbVariants ?? []).map((v) => [v.id, v]));
-  const hasVariants = new Set((dbVariants ?? []).map((v) => v.item_id));
-
-  const unavailable: string[] = [];
-  let subtotal = 0;
-  const orderItems: {
-    menu_item_id: string;
-    variant_id: string | null;
-    name_snapshot: string;
-    unit_price_paise_snapshot: number;
-    quantity: number;
-    line_total_paise: number;
-  }[] = [];
-
-  for (const line of lines) {
-    const item = itemById.get(line.itemId);
-    if (!item || !item.is_available) {
-      unavailable.push(item?.name ?? "an item");
-      continue;
-    }
-
-    let unitPrice: number;
-    let nameSnapshot: string;
-    let variantId: string | null = null;
-
-    if (line.variantId) {
-      const v = variantById.get(line.variantId);
-      if (!v || v.item_id !== line.itemId || !v.is_available) {
-        unavailable.push(item.name);
-        continue;
-      }
-      unitPrice = v.price_paise;
-      nameSnapshot = `${item.name} — ${v.name}`;
-      variantId = v.id;
-    } else if (hasVariants.has(line.itemId)) {
-      // A size-variant item ordered without a size — reject.
-      unavailable.push(item.name);
-      continue;
-    } else {
-      unitPrice = item.price_paise;
-      nameSnapshot = item.name;
-    }
-
-    const lineTotal = unitPrice * line.qty;
-    subtotal += lineTotal;
-    orderItems.push({
-      menu_item_id: line.itemId,
-      variant_id: variantId,
-      name_snapshot: nameSnapshot,
-      unit_price_paise_snapshot: unitPrice,
-      quantity: line.qty,
-      line_total_paise: lineTotal,
-    });
-  }
-
-  if (unavailable.length > 0) {
+  // Server-side pricing (shared with counter billing).
+  const priced = await priceLines(supabase, input.items);
+  if (!priced.ok) {
     return {
-      error: `No longer available: ${[...new Set(unavailable)].join(", ")}. Please update your cart.`,
+      error:
+        priced.error === "No items selected."
+          ? "Your cart is empty."
+          : priced.error,
     };
   }
+  const { orderItems, subtotalPaise: subtotal } = priced;
   const total = subtotal; // no taxes/fees in v1
 
   let session: Awaited<ReturnType<typeof ensureSession>>;
